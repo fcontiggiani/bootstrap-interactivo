@@ -37,7 +37,7 @@ La idea central: si la muestra disponible es una buena representación de la pob
 Simplemente abrí `index.html` en cualquier navegador moderno. No requiere servidor ni instalación.
 
 ```bash
-git clone https://github.com/TU_USUARIO/bootstrap-interactivo.git
+git clone https://github.com/fcontiggiani/bootstrap-interactivo.git
 cd bootstrap-interactivo
 # abrí index.html en tu navegador
 ```
