@@ -2,7 +2,7 @@
 
 Simulador animado del método de remuestreo bootstrap para comprender su lógica y finalidad de forma visual e intuitiva.
 
-🔗 **[Ver demo en vivo](https://TU_USUARIO.github.io/bootstrap-interactivo/)**
+🔗 **[Ver demo en vivo](https://fcontiggiani.github.io/bootstrap-interactivo/)**
 
 ---
 
