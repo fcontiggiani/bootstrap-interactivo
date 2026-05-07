@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bootstrap Interactivo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f3;--card:#fff;--text:#1a1a18;--muted:#6b6b67;
+  --border:rgba(0,0,0,.12);--radius:10px;
+  --blue:#185FA5;--blue2:#0C447C;--green:#1D9E75;--orange:#D85A30;
+  --info-bg:#E6F1FB;--info-bd:#B5D4F4;--info-tx:#185FA5;
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#1a1a18;--card:#242422;--text:#f0efe8;--muted:#9a9a94;
+    --border:rgba(255,255,255,.12);
+    --info-bg:#042C53;--info-bd:#0C447C;--info-tx:#85B7EB;}
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;padding:1.5rem 1rem;}
+.wrap{max-width:1200px;margin:0 auto;}
+h1{font-size:20px;font-weight:500;margin-bottom:.2rem;}
+.sub{font-size:13px;color:var(--muted);margin-bottom:1.5rem;}
+.card{background:var(--card);border:0.5px solid var(--border);
+  border-radius:var(--radius);padding:1.1rem 1.3rem;margin-bottom:1rem;}
+.lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);margin-bottom:7px;}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:1rem 0;}
+.stat{background:var(--bg);border-radius:8px;padding:.6rem .9rem;}
+.stat .v{font-size:19px;font-weight:500;}
+.stat .l{font-size:10px;color:var(--muted);margin-top:1px;}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;}
+button{cursor:pointer;font-family:inherit;font-size:13px;padding:7px 16px;
+  border-radius:8px;transition:all .15s;}
+#b1{background:var(--blue);color:#fff;border:none;}
+#b1:hover{background:var(--blue2);}
+#b1:disabled{background:#888;cursor:not-allowed;}
+#b100,#bRst{background:transparent;border:0.5px solid var(--border);color:var(--text);}
+#b100:hover,#bRst:hover{background:var(--bg);}
+#b100:disabled,#bRst:disabled{opacity:.4;cursor:not-allowed;}
+.info{background:var(--info-bg);border:0.5px solid var(--info-bd);color:var(--info-tx);
+  border-radius:8px;padding:.6rem .9rem;font-size:13px;line-height:1.55;
+  margin-bottom:1rem;min-height:2.6rem;}
+.cbox{width:100%;height:130px;display:block;}
+.hist{position:relative;width:100%;height:230px;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:7px;}
+.sw{width:11px;height:11px;border-radius:2px;display:inline-block;
+  margin-right:3px;vertical-align:-1px;}
+.explainer{font-size:13px;color:var(--muted);line-height:1.65;}
+.explainer strong{color:var(--text);font-weight:500;}
+.explainer ul{padding-left:1.2rem;margin-top:.5rem;}
+.explainer li{margin-bottom:.35rem;}
+@media(max-width:480px){.stats{grid-template-columns:repeat(2,1fr);}h1{font-size:17px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Bootstrap interactivo</h1>
+  <p class="sub">Exploración animada del método de remuestreo para estimación estadística</p>
+
+  <div class="card">
+    <div class="lbl">Muestra original &nbsp;·&nbsp; n = 20 &nbsp;·&nbsp; ingresos ficticios (miles)</div>
+    <canvas id="cOrig" class="cbox"></canvas>
+
+    <div class="stats">
+      <div class="stat"><div class="v" id="sOrig">—</div><div class="l">media original</div></div>
+      <div class="stat"><div class="v" id="sN">0</div><div class="l">resampleos</div></div>
+      <div class="stat"><div class="v" id="sLo">—</div><div class="l">IC 95% inferior</div></div>
+      <div class="stat"><div class="v" id="sHi">—</div><div class="l">IC 95% superior</div></div>
+    </div>
+
+    <div class="info" id="info">Presioná <strong>Un resampleo</strong> para ver el proceso paso a paso.</div>
+
+    <div class="btns">
+      <button id="b1">&#8635; Un resampleo</button>
+      <button id="b100">&#9654; 100 resampleos</button>
+      <button id="bRst">&#10005; Reiniciar</button>
+    </div>
+
+    <div class="lbl">Muestra bootstrap actual &nbsp;·&nbsp; con reposición</div>
+    <canvas id="cBoot" class="cbox"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="lbl">Distribución bootstrap de la media <span id="bcnt" style="font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
+    <div class="hist"><canvas id="cHist" role="img" aria-label="Histograma distribución bootstrap"></canvas></div>
+    <div class="legend">
+      <span><span class="sw" style="background:#185FA5"></span>distribución bootstrap</span>
+      <span><span class="sw" style="background:#1D9E75"></span>IC 95% (percentil)</span>
+      <span><span class="sw" style="background:#D85A30"></span>media original</span>
+    </div>
+  </div>
+
+  <div class="card explainer">
+    <strong>¿Qué es el bootstrap?</strong>
+    <p style="margin-top:.4rem">Técnica de remuestreo que usa los propios datos para aproximar la distribución muestral de un estadístico, sin asumir normalidad ni conocer la distribución poblacional.</p>
+    <ul>
+      <li><strong>Con reposición:</strong> un mismo dato puede aparecer varias veces en cada muestra bootstrap. Eso es intencional.</li>
+      <li><strong>IC 95% por percentil:</strong> percentiles 2.5 y 97.5 de todas las medias bootstrap. Sin supuestos paramétricos.</li>
+      <li><strong>Convergencia:</strong> con más resampleos el IC se estabiliza y la distribución se suaviza.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+// ── datos ──────────────────────────────────────────────────────────────────
+const N = 20;
+function newSample(){
+  return Array.from({length:N}, ()=>Math.round(30+Math.random()*45));
+}
+let ORIG = newSample();
+let origMean = ORIG.reduce((a,b)=>a+b,0)/N;
+let means = [], busy = false, chart = null;
+
+// ── remuestreo ─────────────────────────────────────────────────────────────
+function rs(a){ return a.map(()=>a[Math.floor(Math.random()*a.length)]); }
+
+// ── dibujado de dotplot ────────────────────────────────────────────────────
+function drawOrig(){ dots(document.getElementById('cOrig'), ORIG, origMean, '#185FA5'); }
+
+function dots(canvas, data, mean, col){
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  if(!W || !H) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(W*dpr);
+  canvas.height = Math.round(H*dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad=36, r=9;
+  const mn = Math.min(...data)-2, mx = Math.max(...data)+2;
+  const tx  = v => pad + (v-mn)/(mx-mn)*(W-pad*2);
+  const axisY = H-20;
+
+  // eje
+  ctx.beginPath(); ctx.moveTo(pad-8,axisY); ctx.lineTo(W-pad+8,axisY);
+  ctx.strokeStyle='rgba(120,120,120,.3)'; ctx.lineWidth=1; ctx.stroke();
+
+  // ticks + etiquetas
+  const t0 = Math.ceil(mn/5)*5;
+  for(let v=t0; v<=mx; v+=5){
+    const x=tx(v);
+    ctx.beginPath(); ctx.moveTo(x,axisY); ctx.lineTo(x,axisY+4);
+    ctx.strokeStyle='rgba(120,120,120,.3)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.font='10px system-ui'; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillStyle='rgba(120,120,120,.8)'; ctx.fillText(v, x, axisY+5);
+  }
+
+  // línea de la media (detrás de los puntos)
+  if(mean != null){
+    const lx = tx(mean);
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(lx,6); ctx.lineTo(lx,axisY-1);
+    ctx.strokeStyle = col==='#1D9E75' ? '#1D9E75' : '#D85A30';
+    ctx.lineWidth=1.5; ctx.setLineDash([5,3]); ctx.globalAlpha=.65;
+    ctx.stroke(); ctx.restore();
+  }
+
+  // puntos apilados ordenados
+  const placed = {};
+  [...data].sort((a,b)=>a-b).forEach(v=>{
+    placed[v] = placed[v]||0;
+    const x=tx(v), y=axisY-r-1-placed[v]*(r*2+2); placed[v]++;
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=col; ctx.globalAlpha=.9; ctx.fill(); ctx.globalAlpha=1;
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=.8; ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold 9px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(v,x,y);
+  });
+
+  // etiqueta de la media
+  if(mean != null){
+    const lx = tx(mean);
+    const label = 'x̄ = '+mean.toFixed(1);
+    ctx.font='bold 11px system-ui';
+    const tw = ctx.measureText(label).width;
+    const lxc = Math.min(Math.max(lx, tw/2+6), W-tw/2-6);
+    ctx.fillStyle = col==='#1D9E75' ? '#1D9E75' : '#D85A30';
+    ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText(label,lxc,4);
+  }
+}
+
+// ── histograma bootstrap ───────────────────────────────────────────────────
+function buildHist(){
+  const bins=20, lo=30, hi=75, step=(hi-lo)/bins;
+  const cnt = new Array(bins).fill(0);
+  means.forEach(m=>{
+    const i = Math.min(Math.floor((m-lo)/step), bins-1);
+    if(i>=0) cnt[i]++;
+  });
+  const labels = Array.from({length:bins}, (_,i)=>(lo+(i+.5)*step).toFixed(1));
+
+  let ciL=null, ciH=null;
+  if(means.length >= 10){
+    const s = [...means].sort((a,b)=>a-b);
+    ciL = s[Math.floor(.025*s.length)];
+    ciH = s[Math.floor(.975*s.length)];
+    document.getElementById('sLo').textContent = ciL.toFixed(1);
+    document.getElementById('sHi').textContent = ciH.toFixed(1);
+  }
+
+  const bc = cnt.map((_,i)=>{
+    const mid = lo+(i+.5)*step;
+    return (ciL!==null && mid>=ciL && mid<=ciH) ? '#1D9E75' : '#185FA5';
+  });
+
+  // plugin de líneas verticales (se registra una sola vez)
+  if(!Chart.registry.plugins.get('vlines')){
+    Chart.register({
+      id:'vlines',
+      afterDraw(c){
+        const ciLv = c._ciL, ciHv = c._ciH, omv = c._origMean;
+        if(ciLv==null) return;
+        const xS=c.scales.x, yS=c.scales.y, ctx2=c.ctx;
+        const gx = v => xS.getPixelForValue(Math.min(Math.floor((v-lo)/step), bins-1));
+        [[omv,'#D85A30',[6,3],2],[ciLv,'#1D9E75',[3,3],1.5],[ciHv,'#1D9E75',[3,3],1.5]]
+          .forEach(([v,cl,d,w])=>{
+            ctx2.save(); ctx2.beginPath();
+            ctx2.moveTo(gx(v),yS.top); ctx2.lineTo(gx(v),yS.bottom);
+            ctx2.strokeStyle=cl; ctx2.lineWidth=w; ctx2.setLineDash(d); ctx2.stroke();
+            ctx2.restore();
+          });
+      }
+    });
+  }
+
+  if(!chart){
+    chart = new Chart(document.getElementById('cHist'),{
+      type:'bar',
+      data:{labels, datasets:[{data:cnt, backgroundColor:bc, borderWidth:0, borderRadius:2}]},
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:120},
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{title:l=>'media ≈ '+l[0].label, label:l=>'freq: '+l.raw}}
+        },
+        scales:{
+          x:{ticks:{font:{size:10},maxRotation:45,callback:(v,i)=>i%4===0?labels[i]:null},grid:{display:false}},
+          y:{ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,.1)'}}
+        }
+      }
+    });
+  } else {
+    chart.data.datasets[0].data = cnt;
+    chart.data.datasets[0].backgroundColor = bc;
+  }
+  // pasar CI y media al plugin via instancia del chart
+  chart._ciL = ciL; chart._ciH = ciH; chart._origMean = origMean;
+  chart.update('none');
+}
+
+// ── un resampleo ───────────────────────────────────────────────────────────
+function one(){
+  const b = rs(ORIG);
+  const m = b.reduce((a,v)=>a+v,0)/N;
+  means.push(m);
+  document.getElementById('sN').textContent  = means.length;
+  document.getElementById('bcnt').textContent = '('+means.length+' medias)';
+  dots(document.getElementById('cBoot'), b, m, '#1D9E75');
+  buildHist();
+  const d=(m-origMean).toFixed(1), sg=d>0?'+':'';
+  const lo=document.getElementById('sLo').textContent;
+  const hi=document.getElementById('sHi').textContent;
+  document.getElementById('info').innerHTML =
+    `<strong>Resampleo #${means.length}:</strong> ${N} datos elegidos al azar <em>con reposición</em>. `+
+    `Media bootstrap: <strong>${m.toFixed(1)}</strong> (${sg}${d} vs. original). `+
+    (means.length>=10
+      ? `IC 95%: [<strong>${parseFloat(lo).toFixed(1)}</strong>, <strong>${parseFloat(hi).toFixed(1)}</strong>].`
+      : 'Seguí remuestreando para construir la distribución.');
+}
+
+// ── 100 resampleos ─────────────────────────────────────────────────────────
+function many(n){
+  busy=true;
+  document.getElementById('b1').disabled   = true;
+  document.getElementById('b100').disabled = true;
+  let last;
+  for(let i=0;i<n;i++){
+    const b=rs(ORIG);
+    means.push(b.reduce((a,v)=>a+v,0)/N);
+    if(i===n-1) last=b;
+  }
+  dots(document.getElementById('cBoot'), last, means[means.length-1], '#1D9E75');
+  document.getElementById('sN').textContent  = means.length;
+  document.getElementById('bcnt').textContent = '('+means.length+' medias)';
+  buildHist();
+  const lo = parseFloat(document.getElementById('sLo').textContent);
+  const hi = parseFloat(document.getElementById('sHi').textContent);
+  const pct = (100*means.filter(m=>m>=lo&&m<=hi).length/means.length).toFixed(0);
+  document.getElementById('info').innerHTML =
+    `<strong>${means.length} resampleos completados.</strong> IC 95%: `+
+    `[<strong>${lo.toFixed(1)}</strong>, <strong>${hi.toFixed(1)}</strong>]. `+
+    `El <strong>${pct}%</strong> de las medias bootstrap caen dentro del intervalo.`;
+  busy=false;
+  document.getElementById('b1').disabled   = false;
+  document.getElementById('b100').disabled = false;
+}
+
+// ── reiniciar ──────────────────────────────────────────────────────────────
+function reset(){
+  ORIG = newSample();
+  origMean = ORIG.reduce((a,b)=>a+b,0)/N;
+  means = [];
+  if(chart){ chart.destroy(); chart=null; }
+  document.getElementById('sOrig').textContent = origMean.toFixed(1);
+  document.getElementById('sN').textContent    = '0';
+  document.getElementById('sLo').textContent   = '—';
+  document.getElementById('sHi').textContent   = '—';
+  document.getElementById('bcnt').textContent  = '';
+  document.getElementById('info').innerHTML    = 'Presioná <strong>Un resampleo</strong> para ver el proceso paso a paso.';
+  // limpiar canvas bootstrap
+  const cb=document.getElementById('cBoot'), dpr=window.devicePixelRatio||1;
+  cb.width=(cb.offsetWidth||680)*dpr; cb.height=cb.offsetHeight*dpr;
+  cb.getContext('2d').clearRect(0,0,cb.width,cb.height);
+  // redibujar muestra original nueva
+  setTimeout(drawOrig, 50);
+}
+
+// ── eventos ────────────────────────────────────────────────────────────────
+document.getElementById('b1')  .addEventListener('click', ()=>{ if(!busy) one();   });
+document.getElementById('b100').addEventListener('click', ()=>{ if(!busy) many(100); });
+document.getElementById('bRst').addEventListener('click', ()=>{ if(!busy) reset();  });
+
+// ── inicio ─────────────────────────────────────────────────────────────────
+window.addEventListener('load', ()=>{
+  document.getElementById('sOrig').textContent = origMean.toFixed(1);
+  const cOrig = document.getElementById('cOrig');
+  new ResizeObserver(drawOrig).observe(cOrig);
+  setTimeout(drawOrig, 100);
+});
+</script>
+</body>
+</html>
