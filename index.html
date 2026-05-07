@@ -43,8 +43,7 @@ button{cursor:pointer;font-family:inherit;font-size:13px;padding:7px 16px;
 .info{background:var(--info-bg);border:0.5px solid var(--info-bd);color:var(--info-tx);
   border-radius:8px;padding:.6rem .9rem;font-size:13px;line-height:1.55;
   margin-bottom:1rem;min-height:2.6rem;}
-.cbox{width:100%;height:130px;border-radius:8px;border:0.5px solid var(--border);
-  background:var(--bg);overflow:hidden;display:block;}
+.cbox{width:100%;height:130px;display:block;}
 .hist{position:relative;width:100%;height:230px;}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:7px;}
 .sw{width:11px;height:11px;border-radius:2px;display:inline-block;
@@ -86,7 +85,7 @@ button{cursor:pointer;font-family:inherit;font-size:13px;padding:7px 16px;
 
   <div class="card">
     <div class="lbl">Distribución bootstrap de la media <span id="bcnt" style="font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
-    <div class="hist"><canvas id="cHist" role="img" aria-label="Histograma distribución bootstrap">Distribución de medias bootstrap.</canvas></div>
+    <div class="hist"><canvas id="cHist" role="img" aria-label="Histograma distribución bootstrap"></canvas></div>
     <div class="legend">
       <span><span class="sw" style="background:#185FA5"></span>distribución bootstrap</span>
       <span><span class="sw" style="background:#1D9E75"></span>IC 95% (percentil)</span>
@@ -106,169 +105,232 @@ button{cursor:pointer;font-family:inherit;font-size:13px;padding:7px 16px;
 </div>
 
 <script>
-const ORIG=[42,38,55,61,34,48,52,39,67,44,50,36,58,71,45,43,62,37,56,49];
-const N=ORIG.length;
-const origMean=ORIG.reduce((a,b)=>a+b,0)/N;
-let means=[],busy=false,chart=null;
+// ── datos ──────────────────────────────────────────────────────────────────
+const N = 20;
+function newSample(){
+  return Array.from({length:N}, ()=>Math.round(30+Math.random()*45));
+}
+let ORIG = newSample();
+let origMean = ORIG.reduce((a,b)=>a+b,0)/N;
+let means = [], busy = false, chart = null;
 
-function rs(a){return a.map(()=>a[Math.floor(Math.random()*a.length)]);}
+// ── remuestreo ─────────────────────────────────────────────────────────────
+function rs(a){ return a.map(()=>a[Math.floor(Math.random()*a.length)]); }
 
-function dots(canvas,data,mean,col){
-  const dpr=window.devicePixelRatio||1;
-  const W=canvas.offsetWidth, H=canvas.offsetHeight;
-  if(!W||!H) return;
-  canvas.width=Math.round(W*dpr);
-  canvas.height=Math.round(H*dpr);
-  const ctx=canvas.getContext('2d');
-  ctx.scale(dpr,dpr);
+// ── dibujado de dotplot ────────────────────────────────────────────────────
+function drawOrig(){ dots(document.getElementById('cOrig'), ORIG, origMean, '#185FA5'); }
+
+function dots(canvas, data, mean, col){
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  if(!W || !H) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(W*dpr);
+  canvas.height = Math.round(H*dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
 
   const pad=36, r=9;
-  const mn=Math.min(...data)-2, mx=Math.max(...data)+2;
-  const tx=v=>pad+(v-mn)/(mx-mn)*(W-pad*2);
-  const axisY=H-20;
+  const mn = Math.min(...data)-2, mx = Math.max(...data)+2;
+  const tx  = v => pad + (v-mn)/(mx-mn)*(W-pad*2);
+  const axisY = H-20;
 
-  ctx.beginPath();ctx.moveTo(pad-8,axisY);ctx.lineTo(W-pad+8,axisY);
-  ctx.strokeStyle='rgba(120,120,120,.3)';ctx.lineWidth=1;ctx.stroke();
+  // eje
+  ctx.beginPath(); ctx.moveTo(pad-8,axisY); ctx.lineTo(W-pad+8,axisY);
+  ctx.strokeStyle='rgba(120,120,120,.3)'; ctx.lineWidth=1; ctx.stroke();
 
-  const t0=Math.ceil(mn/5)*5;
-  for(let v=t0;v<=mx;v+=5){
+  // ticks + etiquetas
+  const t0 = Math.ceil(mn/5)*5;
+  for(let v=t0; v<=mx; v+=5){
     const x=tx(v);
-    ctx.beginPath();ctx.moveTo(x,axisY);ctx.lineTo(x,axisY+4);
-    ctx.strokeStyle='rgba(120,120,120,.3)';ctx.lineWidth=1;ctx.stroke();
-    ctx.font='10px system-ui';ctx.textAlign='center';ctx.textBaseline='top';
-    ctx.fillStyle='rgba(120,120,120,.8)';ctx.fillText(v,x,axisY+5);
+    ctx.beginPath(); ctx.moveTo(x,axisY); ctx.lineTo(x,axisY+4);
+    ctx.strokeStyle='rgba(120,120,120,.3)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.font='10px system-ui'; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillStyle='rgba(120,120,120,.8)'; ctx.fillText(v, x, axisY+5);
   }
 
-  if(mean!=null){
-    const lx=tx(mean);
-    ctx.save();ctx.beginPath();ctx.moveTo(lx,6);ctx.lineTo(lx,axisY-1);
-    ctx.strokeStyle=col==='#1D9E75'?'#1D9E75':'#D85A30';
-    ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.globalAlpha=.65;
-    ctx.stroke();ctx.restore();
+  // línea de la media (detrás de los puntos)
+  if(mean != null){
+    const lx = tx(mean);
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(lx,6); ctx.lineTo(lx,axisY-1);
+    ctx.strokeStyle = col==='#1D9E75' ? '#1D9E75' : '#D85A30';
+    ctx.lineWidth=1.5; ctx.setLineDash([5,3]); ctx.globalAlpha=.65;
+    ctx.stroke(); ctx.restore();
   }
 
-  const placed={};
+  // puntos apilados ordenados
+  const placed = {};
   [...data].sort((a,b)=>a-b).forEach(v=>{
-    placed[v]=placed[v]||0;
-    const x=tx(v),y=axisY-r-1-placed[v]*(r*2+2);placed[v]++;
-    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fillStyle=col;ctx.globalAlpha=.9;ctx.fill();ctx.globalAlpha=1;
-    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=.8;ctx.stroke();
-    ctx.fillStyle='#fff';ctx.font='bold 9px system-ui';
-    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(v,x,y);
+    placed[v] = placed[v]||0;
+    const x=tx(v), y=axisY-r-1-placed[v]*(r*2+2); placed[v]++;
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=col; ctx.globalAlpha=.9; ctx.fill(); ctx.globalAlpha=1;
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=.8; ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold 9px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(v,x,y);
   });
 
-  if(mean!=null){
-    const lx=tx(mean);
-    const label='x̄ = '+mean.toFixed(1);
+  // etiqueta de la media
+  if(mean != null){
+    const lx = tx(mean);
+    const label = 'x̄ = '+mean.toFixed(1);
     ctx.font='bold 11px system-ui';
-    const tw=ctx.measureText(label).width;
-    const lxc=Math.min(Math.max(lx,tw/2+6),W-tw/2-6);
-    ctx.fillStyle=col==='#1D9E75'?'#1D9E75':'#D85A30';
-    ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(label,lxc,4);
+    const tw = ctx.measureText(label).width;
+    const lxc = Math.min(Math.max(lx, tw/2+6), W-tw/2-6);
+    ctx.fillStyle = col==='#1D9E75' ? '#1D9E75' : '#D85A30';
+    ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText(label,lxc,4);
   }
 }
 
-function hist(){
-  const bins=20,lo=30,hi=75,step=(hi-lo)/bins;
-  const cnt=new Array(bins).fill(0);
-  means.forEach(m=>{const i=Math.min(Math.floor((m-lo)/step),bins-1);if(i>=0)cnt[i]++;});
-  const labels=Array.from({length:bins},(_,i)=>(lo+(i+.5)*step).toFixed(1));
-  let ciL=null,ciH=null;
-  if(means.length>=10){
-    const s=[...means].sort((a,b)=>a-b);
-    ciL=s[Math.floor(.025*s.length)];ciH=s[Math.floor(.975*s.length)];
-    document.getElementById('sLo').textContent=ciL.toFixed(1);
-    document.getElementById('sHi').textContent=ciH.toFixed(1);
+// ── histograma bootstrap ───────────────────────────────────────────────────
+function buildHist(){
+  const bins=20, lo=30, hi=75, step=(hi-lo)/bins;
+  const cnt = new Array(bins).fill(0);
+  means.forEach(m=>{
+    const i = Math.min(Math.floor((m-lo)/step), bins-1);
+    if(i>=0) cnt[i]++;
+  });
+  const labels = Array.from({length:bins}, (_,i)=>(lo+(i+.5)*step).toFixed(1));
+
+  let ciL=null, ciH=null;
+  if(means.length >= 10){
+    const s = [...means].sort((a,b)=>a-b);
+    ciL = s[Math.floor(.025*s.length)];
+    ciH = s[Math.floor(.975*s.length)];
+    document.getElementById('sLo').textContent = ciL.toFixed(1);
+    document.getElementById('sHi').textContent = ciH.toFixed(1);
   }
-  const bc=cnt.map((_,i)=>{const m=lo+(i+.5)*step;return(ciL&&m>=ciL&&m<=ciH)?'#1D9E75':'#185FA5';});
-  const lp={id:'vlines',afterDraw(c){
-    if(!ciL)return;
-    const x=c.scales.x,y=c.scales.y,ctx2=c.ctx;
-    const gx=v=>x.getPixelForValue(Math.min(Math.floor((v-lo)/step),bins-1));
-    [[origMean,'#D85A30',[6,3],2],[ciL,'#1D9E75',[3,3],1.5],[ciH,'#1D9E75',[3,3],1.5]].forEach(([v,cl,d,w])=>{
-      ctx2.save();ctx2.beginPath();ctx2.moveTo(gx(v),y.top);ctx2.lineTo(gx(v),y.bottom);
-      ctx2.strokeStyle=cl;ctx2.lineWidth=w;ctx2.setLineDash(d);ctx2.stroke();ctx2.restore();
+
+  const bc = cnt.map((_,i)=>{
+    const mid = lo+(i+.5)*step;
+    return (ciL!==null && mid>=ciL && mid<=ciH) ? '#1D9E75' : '#185FA5';
+  });
+
+  // plugin de líneas verticales (se registra una sola vez)
+  if(!Chart.registry.plugins.get('vlines')){
+    Chart.register({
+      id:'vlines',
+      afterDraw(c){
+        const ciLv = c._ciL, ciHv = c._ciH, omv = c._origMean;
+        if(ciLv==null) return;
+        const xS=c.scales.x, yS=c.scales.y, ctx2=c.ctx;
+        const gx = v => xS.getPixelForValue(Math.min(Math.floor((v-lo)/step), bins-1));
+        [[omv,'#D85A30',[6,3],2],[ciLv,'#1D9E75',[3,3],1.5],[ciHv,'#1D9E75',[3,3],1.5]]
+          .forEach(([v,cl,d,w])=>{
+            ctx2.save(); ctx2.beginPath();
+            ctx2.moveTo(gx(v),yS.top); ctx2.lineTo(gx(v),yS.bottom);
+            ctx2.strokeStyle=cl; ctx2.lineWidth=w; ctx2.setLineDash(d); ctx2.stroke();
+            ctx2.restore();
+          });
+      }
     });
-  }};
+  }
+
   if(!chart){
-    Chart.register(lp);
-    chart=new Chart(document.getElementById('cHist'),{
+    chart = new Chart(document.getElementById('cHist'),{
       type:'bar',
-      data:{labels,datasets:[{data:cnt,backgroundColor:bc,borderWidth:0,borderRadius:2}]},
-      options:{responsive:true,maintainAspectRatio:false,animation:{duration:120},
-        plugins:{legend:{display:false},tooltip:{callbacks:{title:l=>'media ≈ '+l[0].label,label:l=>'freq: '+l.raw}}},
-        scales:{x:{ticks:{font:{size:10},maxRotation:45,callback:(v,i)=>i%4===0?labels[i]:null},grid:{display:false}},
-          y:{ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,.1)'}}}}
+      data:{labels, datasets:[{data:cnt, backgroundColor:bc, borderWidth:0, borderRadius:2}]},
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:120},
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{title:l=>'media ≈ '+l[0].label, label:l=>'freq: '+l.raw}}
+        },
+        scales:{
+          x:{ticks:{font:{size:10},maxRotation:45,callback:(v,i)=>i%4===0?labels[i]:null},grid:{display:false}},
+          y:{ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,.1)'}}
+        }
+      }
     });
   } else {
-    chart.data.datasets[0].data=cnt;
-    chart.data.datasets[0].backgroundColor=bc;
-    chart.update('none');
+    chart.data.datasets[0].data = cnt;
+    chart.data.datasets[0].backgroundColor = bc;
   }
+  // pasar CI y media al plugin via instancia del chart
+  chart._ciL = ciL; chart._ciH = ciH; chart._origMean = origMean;
+  chart.update('none');
 }
 
+// ── un resampleo ───────────────────────────────────────────────────────────
 function one(){
-  const b=rs(ORIG),m=b.reduce((a,v)=>a+v,0)/N;
+  const b = rs(ORIG);
+  const m = b.reduce((a,v)=>a+v,0)/N;
   means.push(m);
-  document.getElementById('sN').textContent=means.length;
-  document.getElementById('bcnt').textContent='('+means.length+' medias)';
-  dots(document.getElementById('cBoot'),b,m,'#1D9E75');
-  hist();
-  const d=(m-origMean).toFixed(1),sg=d>0?'+':'';
-  const lo=document.getElementById('sLo').textContent,hi=document.getElementById('sHi').textContent;
-  document.getElementById('info').innerHTML=
+  document.getElementById('sN').textContent  = means.length;
+  document.getElementById('bcnt').textContent = '('+means.length+' medias)';
+  dots(document.getElementById('cBoot'), b, m, '#1D9E75');
+  buildHist();
+  const d=(m-origMean).toFixed(1), sg=d>0?'+':'';
+  const lo=document.getElementById('sLo').textContent;
+  const hi=document.getElementById('sHi').textContent;
+  document.getElementById('info').innerHTML =
     `<strong>Resampleo #${means.length}:</strong> ${N} datos elegidos al azar <em>con reposición</em>. `+
     `Media bootstrap: <strong>${m.toFixed(1)}</strong> (${sg}${d} vs. original). `+
-    (means.length>=10?`IC 95%: [<strong>${parseFloat(lo).toFixed(1)}</strong>, <strong>${parseFloat(hi).toFixed(1)}</strong>].`:'Seguí remuestreando para construir la distribución.');
+    (means.length>=10
+      ? `IC 95%: [<strong>${parseFloat(lo).toFixed(1)}</strong>, <strong>${parseFloat(hi).toFixed(1)}</strong>].`
+      : 'Seguí remuestreando para construir la distribución.');
 }
 
+// ── 100 resampleos ─────────────────────────────────────────────────────────
 function many(n){
   busy=true;
-  document.getElementById('b1').disabled=true;
-  document.getElementById('b100').disabled=true;
+  document.getElementById('b1').disabled   = true;
+  document.getElementById('b100').disabled = true;
   let last;
-  for(let i=0;i<n;i++){const b=rs(ORIG);means.push(b.reduce((a,v)=>a+v,0)/N);if(i===n-1)last=b;}
-  dots(document.getElementById('cBoot'),last,means[means.length-1],'#1D9E75');
-  document.getElementById('sN').textContent=means.length;
-  document.getElementById('bcnt').textContent='('+means.length+' medias)';
-  hist();
-  const lo=parseFloat(document.getElementById('sLo').textContent);
-  const hi=parseFloat(document.getElementById('sHi').textContent);
-  const pct=(100*means.filter(m=>m>=lo&&m<=hi).length/means.length).toFixed(0);
-  document.getElementById('info').innerHTML=
+  for(let i=0;i<n;i++){
+    const b=rs(ORIG);
+    means.push(b.reduce((a,v)=>a+v,0)/N);
+    if(i===n-1) last=b;
+  }
+  dots(document.getElementById('cBoot'), last, means[means.length-1], '#1D9E75');
+  document.getElementById('sN').textContent  = means.length;
+  document.getElementById('bcnt').textContent = '('+means.length+' medias)';
+  buildHist();
+  const lo = parseFloat(document.getElementById('sLo').textContent);
+  const hi = parseFloat(document.getElementById('sHi').textContent);
+  const pct = (100*means.filter(m=>m>=lo&&m<=hi).length/means.length).toFixed(0);
+  document.getElementById('info').innerHTML =
     `<strong>${means.length} resampleos completados.</strong> IC 95%: `+
     `[<strong>${lo.toFixed(1)}</strong>, <strong>${hi.toFixed(1)}</strong>]. `+
     `El <strong>${pct}%</strong> de las medias bootstrap caen dentro del intervalo.`;
   busy=false;
-  document.getElementById('b1').disabled=false;
-  document.getElementById('b100').disabled=false;
+  document.getElementById('b1').disabled   = false;
+  document.getElementById('b100').disabled = false;
 }
 
+// ── reiniciar ──────────────────────────────────────────────────────────────
 function reset(){
-  means=[];
-  if(chart){chart.destroy();chart=null;}
-  ['sN','sLo','sHi'].forEach(id=>document.getElementById(id).textContent=id==='sN'?'0':'—');
-  document.getElementById('bcnt').textContent='';
-  document.getElementById('info').innerHTML='Presioná <strong>Un resampleo</strong> para ver el proceso paso a paso.';
-  const c=document.getElementById('cBoot'),dpr=devicePixelRatio||1;
-  c.width=(c.offsetWidth||680)*dpr;c.height=80*dpr;
-  c.getContext('2d').clearRect(0,0,c.width*dpr,c.height*dpr);
-  dots(document.getElementById('cOrig'),ORIG,origMean,'#185FA5');
+  ORIG = newSample();
+  origMean = ORIG.reduce((a,b)=>a+b,0)/N;
+  means = [];
+  if(chart){ chart.destroy(); chart=null; }
+  document.getElementById('sOrig').textContent = origMean.toFixed(1);
+  document.getElementById('sN').textContent    = '0';
+  document.getElementById('sLo').textContent   = '—';
+  document.getElementById('sHi').textContent   = '—';
+  document.getElementById('bcnt').textContent  = '';
+  document.getElementById('info').innerHTML    = 'Presioná <strong>Un resampleo</strong> para ver el proceso paso a paso.';
+  // limpiar canvas bootstrap
+  const cb=document.getElementById('cBoot'), dpr=window.devicePixelRatio||1;
+  cb.width=(cb.offsetWidth||680)*dpr; cb.height=cb.offsetHeight*dpr;
+  cb.getContext('2d').clearRect(0,0,cb.width,cb.height);
+  // redibujar muestra original nueva
+  setTimeout(drawOrig, 50);
 }
 
-document.getElementById('b1').onclick=()=>{if(!busy)one();};
-document.getElementById('b100').onclick=()=>{if(!busy)many(100);};
-document.getElementById('bRst').onclick=()=>{if(!busy)reset();};
+// ── eventos ────────────────────────────────────────────────────────────────
+document.getElementById('b1')  .addEventListener('click', ()=>{ if(!busy) one();   });
+document.getElementById('b100').addEventListener('click', ()=>{ if(!busy) many(100); });
+document.getElementById('bRst').addEventListener('click', ()=>{ if(!busy) reset();  });
 
-window.onload=()=>{
-  document.getElementById('sOrig').textContent=origMean.toFixed(1);
-  const cOrig=document.getElementById('cOrig');
-  const draw=()=>dots(cOrig,ORIG,origMean,'#185FA5');
-  setTimeout(draw,100);
-  new ResizeObserver(()=>draw()).observe(cOrig);
-};
+// ── inicio ─────────────────────────────────────────────────────────────────
+window.addEventListener('load', ()=>{
+  document.getElementById('sOrig').textContent = origMean.toFixed(1);
+  const cOrig = document.getElementById('cOrig');
+  new ResizeObserver(drawOrig).observe(cOrig);
+  setTimeout(drawOrig, 100);
+});
 </script>
 </body>
 </html>
